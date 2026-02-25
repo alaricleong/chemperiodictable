@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Electrolysis Lab</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --panel: #ffffff;
+            --primary: #2563eb;
+            --text: #0f172a;
+            --wire: #475569;
+            --electron: #facc15;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --border: #e2e8f0;
+        }
+        body { 
+            font-family: 'Aptos', 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            background: var(--bg); 
+            color: var(--text);
+            margin: 0;
+            padding: 10px;
+        }
+        #sim-container { 
+            background: var(--panel); 
+            padding: 15px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05); 
+            max-width: 900px;
+            width: 100%;
+        }
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            justify-content: center;
+        }
+        canvas { 
+            background: #fff; 
+            border-radius: 8px; 
+            max-width: 540px;
+            height: auto;
+            border: 1px solid var(--border);
+        }
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 180px;
+            flex-shrink: 0;
+        }
+        .select-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        select {
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            background-color: white;
+            font-family: 'Aptos', sans-serif;
+            font-size: 0.8rem;
+            color: var(--text);
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .btn {
+            padding: 10px 8px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            font-weight: 700;
+            font-family: 'Aptos', sans-serif;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            text-align: center;
+            width: 100%;
+        }
+        
+        .btn-main { background: var(--primary); color: white; }
+        .btn-main.on { background: var(--danger); }
+        
+        .btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid #cbd5e1; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        
+        .btn-test { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+        .btn-test:hover { background: #fef3c7; }
+
+        .indicator-btn.active { background: #059669; color: white; border: none; }
+
+        .status-msg {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-align: center;
+            color: var(--primary);
+            min-height: 1.2rem;
+            padding: 4px;
+            background: #eff6ff;
+            border-radius: 4px;
+        }
+        
+        .section-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+
+        .test-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sim-container">
+        <div class="main-layout">
+            <!-- Consolidated Left Panel -->
+            <div class="side-panel">
+                <div class="status-msg" id="statusMsg">Ready</div>
+
+                <button id="powerBtn" class="btn btn-main" onclick="togglePower()">START CELL</button>
+                <button class="btn btn-secondary" onclick="initSim()">RESET LAB</button>
+                
+                <div class="section-divider"></div>
+
+                <div class="select-group">
+                    <label>Electrode Material</label>
+                    <select id="electrodeSelect" onchange="initSim()">
+                        <option value="Graphite">Graphite</option>
+                        <option value="Platinum">Platinum</option>
+                        <option value="Copper">Copper</option>
+                    </select>
+                </div>
+                <div class="select-group">
+                    <label>Electrolyte Solution</label>
+                    <select id="electrolyteSelect" onchange="initSim()">
+                        <option value="CuSO₄">CuSO₄(aq)</option>
+                        <option value="AgNO₃">AgNO₃(aq)</option>
+                        <option value="Concentrated NaCl">Conc. NaCl(aq)</option>
+                        <option value="Dilute NaCl">Dil. NaCl(aq)</option>
+                        <option value="Molten NaCl">NaCl(l)</option>
+                    </select>
+                </div>
+
+                <button id="indicatorBtn" class="btn btn-secondary indicator-btn" onclick="toggleIndicator()">TOGGLE INDICATOR</button>
+
+                <div class="section-divider"></div>
+
+                <div class="test-controls">
+                    <label>Gas Identification</label>
+                    <select id="testSelect">
+                        <option value="glowing">Glowing Splint</option>
+                        <option value="burning">Burning Splint</option>
+                    </select>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-test" onclick="triggerTest('anode')" style="padding: 6px 2px;">Test Anode</button>
+                        <button class="btn btn-test" onclick="triggerTest('cathode')" style="padding: 6px 2px;">Test Cathode</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulation Display -->
+            <canvas id="canvas" width="540" height="420"></canvas>
+        </div>
+    </div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const indicatorBtn = document.getElementById('indicatorBtn');
+const powerBtn = document.getElementById('powerBtn');
+const statusMsg = document.getElementById('statusMsg');
+const electrodeSelect = document.getElementById('electrodeSelect');
+const electrolyteSelect = document.getElementById('electrolyteSelect');
+const testSelect = document.getElementById('testSelect');
+
+const FONT_MAIN = "bold 12px Aptos";
+const FONT_ION = "bold 11px Aptos";
+const FONT_EQUATION = "bold 13px Aptos";
+
+let isRunning = false;
+let indicatorActive = false;
+let bubbles = [];
+let particles = [];
+let electrons = [];
+let anodeWidth = 24; 
+let cathodeGrowth = 0;
+let initialIonCount = 0;
+let splintPos = { x: -100, y: -100, active: false };
+let splintState = 'normal';
+let splintTimer = 0;
+const FIXED_ION_COUNT = 30; 
+
+const scenarios = {
+    "Molten NaCl": {
+        anode: "2Cl⁻(l) → Cl₂(g) + 2e⁻", 
+        cathode: "Na⁺(l) + e⁻ → Na(l)",
+        overall: "2NaCl(l) → 2Na(l) + Cl₂(g)",
+        anodeIons: [["Cl⁻", 1.0]], 
+        cathodeIons: [["Na⁺", 1.0]],
+        anodeGas: "Cl2", cathodeGas: "none", 
+        baseColor: {r:241, g:245, b:249},
+        indicator: "#4CAF50"
+    },
+    "Dilute NaCl": {
+        anode: "4OH⁻(aq) → 2H₂O(l) + O₂(g) + 4e⁻", 
+        cathode: "2H⁺(aq) + 2e⁻ → H₂(g)",
+        overall: "2H₂O(l) → 2H₂(g) + O₂(g)",
+        anodeIons: [["OH⁻", 0.7], ["Cl⁻", 0.3]], 
+        cathodeIons: [["H⁺", 0.7], ["Na⁺", 0.3]],
+        anodeGas: "O2", cathodeGas: "H2", 
+        baseColor: {r:226, g:232, b:240},
+        indicator: "#4CAF50" 
+    },
+    "Concentrated NaCl": {
+        anode: "2Cl⁻(aq) → Cl₂(g) + 2e⁻", 
+        cathode: "2H⁺(aq) + 2e⁻ → H₂(g)",
+        overall: "2NaCl(aq) + 2H₂O(l) → Cl₂(g) + H₂(g) + 2NaOH(aq)",
+        anodeIons: [["Cl⁻", 0.85], ["OH⁻", 0.15]], 
+        cathodeIons: [["Na⁺", 0.7], ["H⁺", 0.3]],
+        anodeGas: "Cl2", cathodeGas: "H2", 
+        baseColor: {r:203, g:213, b:225},
+        indicator: "#9333ea" 
+    },
+    "CuSO₄": {
+        anode: "4OH⁻(aq) → 2H₂O(l) + O₂(g) + 4e⁻", 
+        cathode: "Cu²⁺(aq) + 2e⁻ → Cu(s)",
+        overall: "2CuSO₄(aq) + 2H₂O(l) → 2Cu(s) + O₂(g) + 2H₂SO₄(aq)",
+        anodeIons: [["OH⁻", 0.6], ["SO₄²⁻", 0.4]], 
+        cathodeIons: [["Cu²⁺", 0.7], ["H⁺", 0.3]],
+        anodeGas: "O2", cathodeGas: "none", 
+        baseColor: {r:37, g:99, b:235}, 
+        indicator: "#dc2626" 
+    },
+    "AgNO₃": {
+        anode: "4OH⁻(aq) → 2H₂O(l) + O₂(g) + 4e⁻", 
+        cathode: "Ag⁺(aq) + e⁻ → Ag(s)",
+        overall: "4AgNO₃(aq) + 2H₂O(l) → 4Ag(s) + O₂(g) + 4HNO₃(aq)",
+        anodeIons: [["OH⁻", 0.6], ["NO₃⁻", 0.4]], 
+        cathodeIons: [["Ag⁺", 0.8], ["H⁺", 0.2]],
+        anodeGas: "O2", cathodeGas: "none", 
+        baseColor: {r:241, g:245, b:249}, 
+        indicator: "#dc2626"
+    }
+};
+
+function playSqueakyPop() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(1250, audioCtx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(350, audioCtx.currentTime + 0.08);
+        
+        gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1);
+    } catch(e) {}
+}
+
+function initSim() {
+    isRunning = false;
+    powerBtn.innerText = "START CELL";
+    powerBtn.classList.remove('on');
+    powerBtn.disabled = false;
+    statusMsg.innerText = "Ready";
+    anodeWidth = 24;
+    cathodeGrowth = 0;
+    particles = [];
+    bubbles = [];
+    electrons = [];
+    splintPos.active = false;
+    
+    const config = getActiveConfig();
+    for(let i=0; i < FIXED_ION_COUNT; i++) {
+        const isAnion = i < (FIXED_ION_COUNT / 2);
+        const list = isAnion ? config.anodeIons : config.cathodeIons;
+        particles.push(createParticle(getWeightedIon(list), isAnion, true));
+    }
+    initialIonCount = particles.filter(p => !p.isAnion && (p.text.includes('Cu') || p.text.includes('Ag') || p.text.includes('Na') || p.text.includes('H'))).length;
+    for(let i=0; i < 6; i++) electrons.push({ progress: i / 6 });
+}
+
+function getActiveConfig() {
+    const electrodeType = electrodeSelect.value;
+    const electrolyteType = electrolyteSelect.value;
+    let config = JSON.parse(JSON.stringify(scenarios[electrolyteType]));
+    if (electrodeType === "Copper" && (electrolyteType === "CuSO₄" || electrolyteType === "AgNO₃")) {
+        config.anode = "Cu(s) → Cu²⁺(aq) + 2e⁻"; 
+        config.anodeGas = "none";
+    }
+    return config;
+}
+
+function getWeightedIon(ionList) {
+    const r = Math.random();
+    let cumulative = 0;
+    for (const [ion, weight] of ionList) {
+        cumulative += weight;
+        if (r <= cumulative) return ion;
+    }
+    return ionList[0][0];
+}
+
+function createParticle(type, isAnion, randomPos = false) {
+    const baseTargetX = isAnion ? 190 : 350;
+    return {
+        text: type,
+        x: randomPos ? (150 + Math.random() * 240) : (isAnion ? 320 : 220),
+        y: 160 + Math.random() * 100,
+        targetX: baseTargetX + ((Math.random() > 0.5 ? -1 : 1) * 10), 
+        isAnion: isAnion,
+        speed: 0.15 + Math.random() * 0.15,
+        isDischarged: false,
+        fade: 1.0
+    };
+}
+
+function togglePower() {
+    if (particles.length === 0) {
+        initSim();
+        return;
+    }
+    isRunning = !isRunning;
+    powerBtn.innerText = isRunning ? "STOP CELL" : "START CELL";
+    powerBtn.classList.toggle('on', isRunning);
+    statusMsg.innerText = isRunning ? "Cell Operating..." : "Cell Paused";
+}
+
+function toggleIndicator() {
+    indicatorActive = !indicatorActive;
+    indicatorBtn.classList.toggle('active', indicatorActive);
+}
+
+function triggerTest(side) {
+    const config = getActiveConfig();
+    const x = side === 'anode' ? 190 : 350;
+    const y = 80; 
+    
+    splintPos = { x, y, active: true };
+    splintState = 'normal';
+    splintTimer = 90;
+
+    const gasAtSide = side === 'anode' ? config.anodeGas : config.cathodeGas;
+    const mode = testSelect.value;
+
+    if (isRunning) {
+        if (mode === 'glowing' && gasAtSide === 'O2') {
+            splintState = 'relit';
+        } else if (mode === 'burning' && gasAtSide === 'H2') {
+            splintState = 'popped';
+            playSqueakyPop();
+        }
+    }
+}
+
+function drawSplint() {
+    if (!splintPos.active) return;
+    
+    ctx.save();
+    ctx.translate(splintPos.x, splintPos.y);
+    ctx.rotate(-Math.PI / 4);
+    
+    // Wood
+    ctx.fillStyle = "#92400e";
+    ctx.fillRect(0, -3, 60, 6);
+    
+    if (splintState === 'relit') {
+        const pulse = 18 + Math.sin(Date.now()/50)*4;
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, pulse);
+        grad.addColorStop(0, "white");
+        grad.addColorStop(0.3, "rgba(255,255,150,0.9)");
+        grad.addColorStop(1, "transparent");
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(0, 0, pulse, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#ef4444";
+        ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(10, 0); ctx.lineTo(0, 10); ctx.lineTo(-18, 0); ctx.fill();
+        ctx.fillStyle = "#fbbf24";
+        ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(5, 0); ctx.lineTo(0, 5); ctx.lineTo(-10, 0); ctx.fill();
+    } else if (splintState === 'popped') {
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 3;
+        for(let i=0; i<12; i++) {
+            const ang = (i / 12) * Math.PI * 2;
+            const len = 12 + Math.random()*18;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(ang)*6, Math.sin(ang)*6);
+            ctx.lineTo(Math.cos(ang)*len, Math.sin(ang)*len);
+            ctx.stroke();
+        }
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText("POP!", 20, -20);
+    } else {
+        const mode = testSelect.value;
+        if (mode === 'glowing') {
+            const glowSize = 7 + Math.sin(Date.now()/100)*3;
+            const grad = ctx.createRadialGradient(0,0,0,0,0,glowSize);
+            grad.addColorStop(0, "#fca5a5");
+            grad.addColorStop(1, "transparent");
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(0,0, glowSize, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#450a0a";
+            ctx.beginPath(); ctx.arc(0,0, 4, 0, Math.PI*2); ctx.fill();
+        } else {
+            ctx.fillStyle = "#ef4444";
+            ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#facc15";
+            ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(6, 0); ctx.lineTo(0, 6); ctx.lineTo(-10, 0); ctx.fill();
+        }
+    }
+    ctx.restore();
+    splintTimer--;
+    if (splintTimer <= 0) splintPos.active = false;
+}
+
+function drawCircuit(x, y) {
+    ctx.strokeStyle = "#64748b";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(190, 100); ctx.lineTo(190, y); ctx.lineTo(x + 12, y);
+    ctx.moveTo(x + 6, y); ctx.lineTo(350, y); ctx.lineTo(350, 100);
+    ctx.stroke();
+    
+    // Battery cells
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x + 12, y - 10); ctx.lineTo(x + 12, y + 10); ctx.stroke();
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(x + 6, y - 5); ctx.lineTo(x + 6, y + 5); ctx.stroke();
+
+    if (isRunning && particles.length > 0) {
+        electrons.forEach(e => {
+            e.progress += 0.008;
+            if (e.progress > 1) e.progress = 0;
+            let ex, ey;
+            const p = e.progress;
+            if (p < 0.25) { ex = 190; ey = 100 - (p/0.25) * (100 - y); } 
+            else if (p < 0.5) { ex = 190 + ((p-0.25)/0.25) * (x + 12 - 190); ey = y; } 
+            else if (p < 0.75) { ex = (x + 6) + ((p-0.5)/0.25) * (350 - (x + 6)); ey = y; } 
+            else { ex = 350; ey = y + ((p-0.75)/0.25) * (100 - y); }
+            ctx.fillStyle = "#eab308";
+            ctx.beginPath(); ctx.arc(ex, ey, 3, 0, Math.PI * 2); ctx.fill();
+        });
+    }
+}
+
+function draw() {
+    const electrodeType = electrodeSelect.value;
+    const electrolyteType = electrolyteSelect.value;
+    const isReactiveAnode = (electrodeType === "Copper" && (electrolyteType === "CuSO₄" || electrolyteType === "AgNO₃"));
+    const metalDeposition = (electrolyteType === "CuSO₄" || electrolyteType === "AgNO₃");
+    let config = getActiveConfig();
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawCircuit(260, 40);
+
+    // Beaker
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(120, 120); ctx.lineTo(120, 320); ctx.lineTo(420, 320); ctx.lineTo(420, 120);
+    ctx.stroke();
+    
+    // Liquid
+    let fillStyle;
+    if (indicatorActive) {
+        fillStyle = config.indicator;
+    } else {
+        const currentIons = particles.filter(p => !p.isAnion && (p.text.includes('Cu') || p.text.includes('Ag') || p.text.includes('Na') || p.text.includes('H'))).length;
+        const ratio = initialIonCount > 0 ? currentIons / initialIonCount : 1;
+        const r = Math.floor(config.baseColor.r + (255 - config.baseColor.r) * (1 - ratio));
+        const g = Math.floor(config.baseColor.g + (255 - config.baseColor.g) * (1 - ratio));
+        const b = Math.floor(config.baseColor.b + (255 - config.baseColor.b) * (1 - ratio));
+        fillStyle = `rgb(${r},${g},${b})`;
+    }
+    ctx.fillStyle = fillStyle;
+    ctx.fillRect(122, 140, 296, 178);
+
+    const baseCol = electrodeType === "Copper" ? "#b45309" : (electrodeType === "Platinum" ? "#94a3b8" : "#1e293b");
+    
+    // Anode (+)
+    ctx.fillStyle = baseCol;
+    if (isReactiveAnode && isRunning && anodeWidth > 6) anodeWidth -= 0.015; 
+    ctx.fillRect(190 - anodeWidth/2, 100, anodeWidth, 160);
+    ctx.fillStyle = "#0f172a"; ctx.textAlign = "center"; ctx.font = FONT_MAIN;
+    ctx.fillText("Anode (+)", 190, 95);
+
+    // Cathode (-)
+    ctx.fillStyle = baseCol;
+    let displayCathodeWidth = 22 + cathodeGrowth;
+    ctx.fillRect(350 - displayCathodeWidth/2, 100, displayCathodeWidth, 160);
+    if (metalDeposition && cathodeGrowth > 1) {
+        ctx.fillStyle = (electrolyteType === "CuSO₄") ? "#ea580c" : "#cbd5e1";
+        for(let i=0; i<160; i+=10) {
+            let bump = Math.sin(i + cathodeGrowth)*3;
+            ctx.fillRect(350 - (displayCathodeWidth/2) - bump, 100+i, displayCathodeWidth + bump*2, 10);
+        }
+    }
+    ctx.fillStyle = "#0f172a"; ctx.textAlign = "center"; ctx.font = FONT_MAIN;
+    ctx.fillText("Cathode (-)", 350, 95);
+
+    // Chemical Equations
+    ctx.fillStyle = "#475569"; ctx.font = FONT_EQUATION;
+    ctx.fillText(config.anode, 140, 60);
+    ctx.fillText(config.cathode, 400, 60);
+
+    // Ions
+    ctx.textBaseline = "middle";
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        ctx.globalAlpha = p.fade;
+        let ballColor = p.isAnion ? "#ef4444" : "#2563eb";
+        if (p.isDischarged) ballColor = "#94a3b8";
+        ctx.fillStyle = ballColor;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.font = FONT_ION;
+        ctx.fillText(p.isDischarged ? p.text.replace(/[⁺⁻²]/g, '') : p.text, p.x, p.y);
+        
+        if (isRunning) {
+            if (!p.isDischarged) {
+                if (p.x < p.targetX) p.x += p.speed;
+                else if (p.x > p.targetX) p.x -= p.speed;
+                if (Math.abs(p.x - p.targetX) < 5) {
+                    const reactive = ["Cl⁻", "OH⁻", "Cu²⁺", "Ag⁺", "H⁺", "Na⁺"];
+                    if (reactive.some(t => p.text.includes(t))) p.isDischarged = true;
+                    else p.x += (Math.random() - 0.5) * 1.5;
+                }
+            } else {
+                p.fade -= 0.02;
+                if (p.fade <= 0) {
+                    particles.splice(i, 1);
+                    if (!p.isAnion && (p.text === "Cu²⁺" || p.text === "Ag⁺")) {
+                        cathodeGrowth += (p.text === "Cu²⁺" ? 0.6 : 0.4); 
+                        if (isReactiveAnode) {
+                            const r = createParticle("Cu²⁺", false, false);
+                            r.x = 190 + anodeWidth/2 + 2; r.y = 130 + Math.random() * 110;
+                            particles.push(r);
+                        }
+                    }
+                    if (particles.length === 0) {
+                        isRunning = false;
+                        statusMsg.innerText = "Reaction Complete";
+                        powerBtn.innerText = "RESET LAB";
+                    }
+                }
+            }
+        }
+    }
+    ctx.globalAlpha = 1.0;
+    ctx.textBaseline = "alphabetic";
+
+    // Bubbles
+    if (isRunning && Math.random() > 0.85) {
+        if (config.anodeGas !== "none") bubbles.push({x: 190 + (Math.random()-0.5)*anodeWidth, y: 160, r: 2+Math.random()*2});
+        if (config.cathodeGas !== "none") bubbles.push({x: 350 + (Math.random()-0.5)*displayCathodeWidth, y: 160, r: 2+Math.random()*2});
+    }
+    ctx.fillStyle = "rgba(180, 198, 220, 0.5)";
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+        const b = bubbles[i];
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
+        b.y -= 1.8;
+        if (b.y < 80) bubbles.splice(i, 1);
+    }
+    
+    // Overall Equation
+    ctx.fillStyle = "#1e293b"; ctx.font = FONT_EQUATION;
+    ctx.textAlign = "center";
+    ctx.fillText("Overall: " + config.overall, canvas.width/2 + 30, 380);
+
+    drawSplint();
+    requestAnimationFrame(draw);
+}
+
+initSim();
+draw();
+</script>
+</body>
+</html>

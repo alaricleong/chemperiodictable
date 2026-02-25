@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compact Simple Cell Lab</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --panel: #ffffff;
+            --primary: #0ea5e9;
+            --text: #0f172a;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+        }
+
+        body {
+            /* Setting Aptos as primary font */
+            font-family: "Aptos", "Segoe UI", "Avenir", system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+        }
+
+        #lab-container {
+            background: var(--panel);
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            max-width: 950px;
+            width: 100%;
+        }
+
+        .main-layout {
+            display: flex;
+            gap: 12px;
+        }
+
+        .side-panel {
+            width: 210px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .meter-box {
+            background: #1e293b;
+            color: #4ade80;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #334155;
+        }
+
+        .voltage-val { font-size: 1.6rem; font-weight: 700; font-family: "Aptos Display", "Aptos", monospace; }
+        .voltage-lbl { font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .select-group { display: flex; flex-direction: column; gap: 2px; }
+        label { font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        
+        select {
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
+            background: #fff;
+            font-family: inherit;
+        }
+
+        .btn {
+            padding: 8px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.75rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-family: inherit;
+        }
+
+        .btn-main { background: var(--primary); color: white; }
+        .btn-main.on { background: var(--danger); }
+        .btn-sub { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
+        .btn-sub.active { background: #8b5cf6; color: white; border: none; }
+        
+        .test-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            background: #f8fafc;
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .equation-area {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 10px;
+        }
+
+        .eq-box { padding: 8px; background: #fff; border-radius: 6px; border: 1px solid var(--border); }
+        .eq-title { font-weight: bold; font-size: 0.7rem; color: #64748b; margin-bottom: 2px; }
+        .formula { font-size: 0.95rem; font-family: "Times New Roman", serif; text-align: center; }
+
+        canvas {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            flex-grow: 1;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="lab-container">
+        <div class="main-layout">
+            <div class="side-panel">
+                <div class="meter-box">
+                    <div class="voltage-lbl">Potential Difference</div>
+                    <div class="voltage-val" id="vDisplay">0.00 V</div>
+                </div>
+
+                <button id="circuitBtn" class="btn btn-main" onclick="toggleCircuit()">Close Circuit</button>
+                
+                <div class="select-group">
+                    <label>Anode Metal</label>
+                    <select id="mLeft" onchange="initSim()">
+                        <option value="Mg">Magnesium (Mg)</option>
+                        <option value="Zn" selected>Zinc (Zn)</option>
+                        <option value="Fe">Iron (Fe)</option>
+                    </select>
+                </div>
+                <div class="select-group">
+                    <label>Cathode Metal</label>
+                    <select id="mRight" onchange="initSim()">
+                        <option value="Cu" selected>Copper (Cu)</option>
+                        <option value="Ag">Silver (Ag)</option>
+                    </select>
+                </div>
+
+                <div class="test-controls">
+                    <button class="btn btn-sub" style="font-size: 0.65rem;" onclick="testGas('burning')">Burn Splint</button>
+                    <button class="btn btn-sub" style="font-size: 0.65rem;" onclick="testGas('glowing')">Glow Splint</button>
+                    <button id="indicatorBtn" class="btn btn-sub" style="grid-column: span 2; font-size: 0.65rem;" onclick="toggleIndicator()">UI Indicator</button>
+                </div>
+
+                <button class="btn btn-sub" onclick="initSim()">Reset Lab</button>
+            </div>
+
+            <canvas id="canvas" width="680" height="380"></canvas>
+        </div>
+
+        <div class="equation-area">
+            <div class="eq-box">
+                <div class="eq-title">Half-Equations</div>
+                <div class="formula" id="anodeEq" style="margin-bottom: 4px;">-</div>
+                <div class="formula" id="cathodeEq">-</div>
+            </div>
+            <div class="eq-box">
+                <div class="eq-title">Overall Cell</div>
+                <div class="formula" id="overallEq" style="margin-top: 5px;">-</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const vDisplay = document.getElementById('vDisplay');
+
+const potentials = { 'Mg': -2.37, 'Zn': -0.76, 'Fe': -0.44, 'Cu': 0.34, 'Ag': 0.80 };
+const colors = { 'Mg': '#e2e8f0', 'Zn': '#cbd5e1', 'Fe': '#94a3b8', 'Cu': '#ea580c', 'Ag': '#f8fafc' };
+
+const BEAKER = { x: 100, y: 160, w: 480, h: 200 };
+
+let isClosed = false;
+let indicatorActive = false;
+let electrons = [];
+let bubbles = [];
+let ions = [];
+let splint = { active: false, x: 0, y: 0, timer: 0, type: '', popped: false };
+let anodeWidthFactor = 1.0; 
+let targetVoltage = 0;
+let currentMeterVoltage = 0;
+
+function initSim() {
+    isClosed = false;
+    anodeWidthFactor = 1.0;
+    targetVoltage = 0;
+    currentMeterVoltage = 0;
+    document.getElementById('circuitBtn').innerText = "Close Circuit";
+    document.getElementById('circuitBtn').classList.remove('on');
+    bubbles = [];
+    electrons = [];
+    initIons();
+    updateEquations();
+}
+
+function initIons() {
+    ions = [];
+    for(let i=0; i<12; i++) {
+        ions.push({
+            x: BEAKER.x + 20 + Math.random() * (BEAKER.w - 40),
+            y: BEAKER.y + 20 + Math.random() * (BEAKER.h - 40),
+            type: 'H+', vx: (Math.random()-0.5)*1.2, vy: (Math.random()-0.5)*1.2, radius: 7
+        });
+        ions.push({
+            x: BEAKER.x + 20 + Math.random() * (BEAKER.w - 40),
+            y: BEAKER.y + 20 + Math.random() * (BEAKER.h - 40),
+            type: 'SO₄²⁻', vx: (Math.random()-0.5)*0.8, vy: (Math.random()-0.5)*0.8, radius: 10
+        });
+    }
+}
+
+function toggleCircuit() {
+    isClosed = !isClosed;
+    document.getElementById('circuitBtn').innerText = isClosed ? "Open Circuit" : "Close Circuit";
+    document.getElementById('circuitBtn').classList.toggle('on', isClosed);
+    if(isClosed) { for(let i=0; i<8; i++) electrons.push({p: i/8}); } 
+    else { electrons = []; targetVoltage = 0; }
+    updateEquations();
+}
+
+function toggleIndicator() {
+    indicatorActive = !indicatorActive;
+    document.getElementById('indicatorBtn').classList.toggle('active', indicatorActive);
+}
+
+function updateEquations() {
+    const l = document.getElementById('mLeft').value, r = document.getElementById('mRight').value;
+    if(!isClosed) {
+        vDisplay.innerText = "0.00 V";
+        document.getElementById('anodeEq').innerText = "-";
+        document.getElementById('cathodeEq').innerText = "-";
+        document.getElementById('overallEq').innerText = "-";
+        return;
+    }
+    const diff = Math.abs(potentials[l] - potentials[r]);
+    targetVoltage = diff;
+    vDisplay.innerText = diff.toFixed(2) + " V";
+    const anode = potentials[l] < potentials[r] ? l : r;
+    document.getElementById('anodeEq').innerHTML = `Ox: ${anode} &rarr; ${anode}<sup>2+</sup> + 2e<sup>-</sup>`;
+    document.getElementById('cathodeEq').innerHTML = `Red: 2H<sup>+</sup> + 2e<sup>-</sup> &rarr; H<sub>2</sub>`;
+    document.getElementById('overallEq').innerHTML = `${anode} + 2H<sup>+</sup> &rarr; ${anode}<sup>2+</sup> + H<sub>2</sub>`;
+}
+
+function testGas(type) {
+    const l = document.getElementById('mLeft').value, r = document.getElementById('mRight').value;
+    const cathodeX = potentials[l] < potentials[r] ? 450 : 200;
+    splint = { active: true, x: cathodeX, y: 140, timer: 100, type, popped: false };
+    if (isClosed && type === 'burning') { splint.popped = true; playPop(); }
+}
+
+function playPop() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+    } catch(e) {}
+}
+
+function drawVoltmeter(x, y) {
+    // Meter body
+    ctx.fillStyle = "#e2e8f0";
+    ctx.beginPath();
+    ctx.roundRect(x - 50, y - 40, 100, 60, 5);
+    ctx.fill();
+    ctx.strokeStyle = "#475569";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Scale arc
+    ctx.beginPath();
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1;
+    ctx.arc(x, y + 5, 35, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 8px Aptos, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("0", x - 30, y - 5);
+    ctx.fillText("3", x + 30, y - 5);
+    ctx.fillText("V", x, y - 25);
+
+    // Needle
+    currentMeterVoltage += (targetVoltage - currentMeterVoltage) * 0.1;
+    const angle = Math.PI * 1.1 + (currentMeterVoltage / 3) * (Math.PI * 0.8);
+    ctx.strokeStyle = "#ef4444";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + 5);
+    ctx.lineTo(x + Math.cos(angle) * 32, y + 5 + Math.sin(angle) * 32);
+    ctx.stroke();
+
+    // Pivot
+    ctx.fillStyle = "#334155";
+    ctx.beginPath();
+    ctx.arc(x, y + 5, 4, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const l = document.getElementById('mLeft').value, r = document.getElementById('mRight').value;
+    const vL = potentials[l], vR = potentials[r];
+    const anodeX = vL < vR ? 200 : 450, cathodeX = vL < vR ? 450 : 200;
+
+    // Electrolyte & Beaker
+    ctx.fillStyle = indicatorActive ? "#bbf7d0" : "rgba(186, 230, 253, 0.3)";
+    ctx.fillRect(BEAKER.x, BEAKER.y, BEAKER.w, BEAKER.h);
+    ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(BEAKER.x, 130); ctx.lineTo(BEAKER.x, 370); ctx.lineTo(BEAKER.x+BEAKER.w, 370); ctx.lineTo(BEAKER.x+BEAKER.w, 130); ctx.stroke();
+
+    // Electrodes
+    const drawE = (x, col, lbl, isAn) => {
+        const w = isAn ? 36 * anodeWidthFactor : 36;
+        ctx.fillStyle = col; ctx.fillRect(x-w/2, 80, w, 240);
+        ctx.strokeStyle = "#475569"; ctx.lineWidth = 1; ctx.strokeRect(x-w/2, 80, w, 240);
+        ctx.fillStyle = "#1e293b"; ctx.font = "bold 12px Aptos, sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(lbl, x, 340);
+        ctx.font = "bold 9px Aptos, sans-serif"; ctx.fillText(isAn ? "ANODE (-)" : "CATHODE (+)", x, 72);
+    };
+    drawE(200, colors[l], l, vL < vR);
+    drawE(450, colors[r], r, vR < vL);
+
+    // Wire
+    ctx.strokeStyle = "#475569"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(200, 80); ctx.lineTo(200, 30); ctx.lineTo(450, 30); ctx.lineTo(450, 80); ctx.stroke();
+
+    // Analog Voltmeter on Wire
+    drawVoltmeter(325, 35);
+
+    if(isClosed && l !== r) {
+        anodeWidthFactor = Math.max(0.1, anodeWidthFactor - 0.0018);
+        const dir = vL < vR ? 1 : -1;
+        electrons.forEach(e => {
+            e.p += 0.007; if(e.p > 1) e.p = 0;
+            let ex, ey;
+            if(dir === 1) {
+                if(e.p < 0.2) { ex = 200; ey = 80 - (e.p/0.2)*50; }
+                else if(e.p < 0.8) { ex = 200 + ((e.p-0.2)/0.6)*250; ey = 30; }
+                else { ex = 450; ey = 30 + ((e.p-0.8)/0.2)*50; }
+            } else {
+                if(e.p < 0.2) { ex = 450; ey = 80 - (e.p/0.2)*50; }
+                else if(e.p < 0.8) { ex = 450 - ((e.p-0.2)/0.6)*250; ey = 30; }
+                else { ex = 200; ey = 30 + ((e.p-0.8)/0.2)*50; }
+            }
+            ctx.fillStyle = "#fbaf24"; ctx.beginPath(); ctx.arc(ex, ey, 6, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#000"; ctx.font = "bold 8px Aptos, sans-serif"; ctx.fillText("e⁻", ex, ey+3);
+        });
+
+        ions.forEach(ion => {
+            if(ion.type === 'H+') {
+                const dx = cathodeX - ion.x, dy = 220 - ion.y, dist = Math.sqrt(dx*dx+dy*dy);
+                ion.vx = (dx/dist)*1.3; ion.vy = (dy/dist)*1.3;
+                if(dist < 20) {
+                    bubbles.push({x: cathodeX + (Math.random()-0.5)*25, y: 240, r: 2+Math.random()*3});
+                    ion.x = BEAKER.x + 20 + Math.random() * (BEAKER.w - 40);
+                    ion.y = BEAKER.y + 20 + Math.random() * (BEAKER.h - 40);
+                }
+            } else {
+                const dx = anodeX - ion.x, dist = Math.sqrt(dx*dx);
+                ion.vx = dist > 40 ? (dx/dist)*0.4 : ion.vx * 0.9;
+            }
+            updateIon(ion);
+        });
+    } else {
+        ions.forEach(ion => {
+            if (ion.x < BEAKER.x + ion.radius || ion.x > BEAKER.x + BEAKER.w - ion.radius) ion.vx *= -1;
+            if (ion.y < BEAKER.y + ion.radius || ion.y > BEAKER.y + BEAKER.h - ion.radius) ion.vy *= -1;
+            updateIon(ion);
+        });
+    }
+
+    // Bubbles
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    for(let i=bubbles.length-1; i>=0; i--) {
+        bubbles[i].y -= 2;
+        ctx.beginPath(); ctx.arc(bubbles[i].x, bubbles[i].y, bubbles[i].r, 0, Math.PI*2); ctx.fill();
+        if(bubbles[i].y < BEAKER.y) bubbles.splice(i, 1);
+    }
+
+    if(splint.active) drawSplint();
+    requestAnimationFrame(draw);
+}
+
+function updateIon(ion) {
+    ion.x += ion.vx; ion.y += ion.vy;
+    if (ion.x < BEAKER.x + ion.radius) ion.x = BEAKER.x + ion.radius;
+    if (ion.x > BEAKER.x + BEAKER.w - ion.radius) ion.x = BEAKER.x + BEAKER.w - ion.radius;
+    if (ion.y < BEAKER.y + ion.radius) ion.y = BEAKER.y + ion.radius;
+    if (ion.y > BEAKER.y + BEAKER.h - ion.radius) ion.y = BEAKER.y + BEAKER.h - ion.radius;
+    
+    ctx.beginPath(); ctx.arc(ion.x, ion.y, ion.radius, 0, Math.PI*2);
+    ctx.fillStyle = ion.type === 'H+' ? "#3b82f6" : "#ef4444";
+    ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = "bold 8px Aptos, sans-serif"; ctx.fillText(ion.type, ion.x, ion.y + 3);
+}
+
+function drawSplint() {
+    ctx.save(); ctx.translate(splint.x, splint.y); ctx.rotate(-Math.PI/4);
+    ctx.fillStyle = "#78350f"; ctx.fillRect(0, -2, 40, 4);
+    if(splint.type === 'burning') {
+        ctx.fillStyle = "#f97316"; ctx.beginPath(); ctx.arc(0,0, 8, 0, Math.PI*2); ctx.fill();
+        if(splint.popped) {
+            ctx.fillStyle = "rgba(251, 191, 36, 0.4)"; ctx.beginPath(); ctx.arc(0,0, 20, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#000"; ctx.font = "bold 10px Aptos, sans-serif"; ctx.fillText("POP!", 15, -10);
+        }
+    } else {
+        ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.arc(0,0, 3, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+    splint.timer--; if(splint.timer <= 0) splint.active = false;
+}
+
+initSim();
+draw();
+</script>
+</body>
+</html>
